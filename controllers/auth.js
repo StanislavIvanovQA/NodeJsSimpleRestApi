@@ -13,9 +13,8 @@ export const signup = (req, res, next) => {
         throw error;
     }
 
-    const email = req.body.email;
-    const name = req.body.name;
-    const password = req.body.password;
+    const { email, name, password } = req.body;
+
     bcrypt.hash(password, 12)
         .then(hashedPassword => {
             const user = new User({
@@ -38,8 +37,7 @@ export const signup = (req, res, next) => {
 };
 
 export const login = (req, res, next) => {
-    const email = req.body.email;
-    const password = req.body.password;
+    const { email, password } = req.body;
     let existingUser;
 
     User.findOne({email})
