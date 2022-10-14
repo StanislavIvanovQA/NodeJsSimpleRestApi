@@ -33,7 +33,7 @@ export const getPosts = (req, res, next) => {
         })
 }
 
-export const postPost = (req, res, next) => {
+export const postPost = async (req, res, next) => {
     const errors = validationResult(req)
 
     if (!errors.isEmpty()) {
@@ -50,40 +50,39 @@ export const postPost = (req, res, next) => {
 
     const imageUrl = req.file.path
     const {title, content} = req.body
-    let creator
     const post = new Post({
         title,
         content,
         imageUrl,
         creator: req.userId,
     })
-    post
-        .save()
-        .then(result => {
-            return User.findById(req.userId)
+
+    try {
+        await post.save()
+        const user = await User.findById(req.userId)
+
+        await user.posts.push(post)
+        await user.save()
+
+        socketIo.getSocket().emit('posts', {
+            action: 'create',
+            post: {...post._doc, creator: {_id: req.userId, name: user.name}},
         })
-        .then(user => {
-            creator = user
-            user.posts.push(post)
-            return user.save()
+
+        await res.status(201).json({
+            message: 'Post was created successfully',
+            post,
+            creator: {_id: user._id, name: user.name},
         })
-        .then(result => {
-            socketIo.getSocket().emit('posts', {
-                action: 'create',
-                post: {...post._doc, creator: {_id: req.userId, name: creator.name}},
-            })
-            res.status(201).json({
-                message: 'Post was created successfully',
-                post,
-                creator: {_id: creator._id, name: creator.name},
-            })
-        })
-        .catch(err => {
-            if (!err.statusCode) {
-                err.statusCode = 500
-            }
-            next(err)
-        })
+
+        return user
+    } catch (err) {
+        if (!err.statusCode) {
+            err.statusCode = 500
+        }
+        next(err)
+        return
+    }
 }
 
 export const getPost = (req, res, next) => {
